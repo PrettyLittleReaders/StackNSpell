@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Bookish Word Link</title>
+
+<style>
+:root{
+--bg1:#120b1a;
+--bg2:#2a1630;
+--paper:#ffeaf4;
+--ink:#2a1a10;
+--gold:#d8b4ff;
+}
+
+*{box-sizing:border-box}
+
+body{
+margin:0;
+font-family:system-ui,Georgia,serif;
+background:radial-gradient(circle at top,var(--bg2),var(--bg1));
+display:flex;
+justify-content:center;
+color:var(--paper);
+}
+
+.app{
+width:100%;
+max-width:420px;
+min-height:100vh;
+padding:12px;
+}
+
+.card{
+background:rgba(255,234,244,.96);
+color:var(--ink);
+border-radius:18px;
+padding:14px;
+box-shadow:0 10px 25px rgba(0,0,0,.4);
+}
+
+button,input{
+width:100%;
+padding:12px;
+margin-top:8px;
+border:none;
+border-radius:12px;
+font-weight:700;
+}
+
+button{
+background:#6b3f2a;
+color:#fff;
+}
+
+.header{
+background:linear-gradient(180deg,#ffeaf4,#e7c6ff);
+color:var(--ink);
+padding:12px;
+border-radius:16px;
+font-weight:700;
+display:flex;
+justify-content:space-between;
+}
+
+.wordBox{
+display:flex;
+justify-content:center;
+gap:6px;
+flex-wrap:wrap;
+margin-top:8px;
+}
+
+.slot{
+width:34px;
+height:34px;
+border-bottom:3px solid var(--ink);
+display:flex;
+justify-content:center;
+align-items:center;
+font-weight:800;
+}
+
+.found{
+display:flex;
+flex-wrap:wrap;
+gap:6px;
+margin-top:8px;
+}
+
+.tag{
+background:#e7c6ff;
+padding:6px 10px;
+border-radius:10px;
+font-weight:700;
+font-size:13px;
+}
+
+.board{
+position:relative;
+height:360px;
+margin-top:12px;
+background:radial-gradient(circle,#2c1c12,#120b08);
+border-radius:22px;
+overflow:hidden;
+}
+
+canvas{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+}
+
+.tile{
+width:62px;
+height:62px;
+position:absolute;
+border-radius:16px;
+background:linear-gradient(180deg,#ffeaf4,#e7c6ff);
+display:flex;
+justify-content:center;
+align-items:center;
+font-size:26px;
+font-weight:900;
+color:var(--ink);
+user-select:none;
+touch-action:none;
+box-shadow:0 6px 12px rgba(0,0,0,.5);
+}
+
+.tile.active{
+background:#d8b4ff;
+transform:scale(1.1);
+}
+
+.modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.6);
+display:none;
+justify-content:center;
+align-items:center;
+}
+
+.modalBox{
+background:var(--paper);
+color:var(--ink);
+padding:18px;
+border-radius:16px;
+width:85%;
+text-align:center;
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<div id="start" class="card">
+<h2>📚 Bookish Word Link</h2>
+<input id="name" placeholder="Enter name">
+<button onclick="startGame('easy')">Easy</button>
+<button onclick="startGame('medium')">Medium</button>
+<button onclick="startGame('hard')">Hard</button>
+</div>
+
+<div id="game" style="display:none">
+
+<div class="header">
+<div id="welcome"></div>
+<div>📖 Chapter Play</div>
+</div>
+
+<div class="card">
+<div class="wordBox" id="wordBox"></div>
+<div class="found" id="found"></div>
+</div>
+
+<div class="board" id="board">
+<canvas id="trail"></canvas>
+</div>
+
+</div>
+</div>
+
+<div class="modal" id="modal">
+<div class="modalBox">
+<h3>🎉 Completed</h3>
+<p id="result"></p>
+<button onclick="shareResult()">Share Result</button>
+<button onclick="location.reload()">Close</button>
+</div>
+</div>
+
+<script>
+
+const puzzles={
+easy:[{main:'BOOK',bonus:['BOO','OK']},{main:'PAGE',bonus:['AGE']}],
+medium:[{main:'AUTHOR',bonus:['HAT','OUR','TOUR']}],
+hard:[{main:'LIBRARY',bonus:['BAR','RAY','RIB']}]
+};
+
+let cur,mode='easy',name='',word='',used=[],active=false;
+let ctx,canvas,path=[];
+let revealed=[],found=[];
+
+function startGame(m){
+name=document.getElementById('name').value.trim();
+if(!name)return alert('Enter name');
+
+mode=m;
+document.getElementById('start').style.display='none';
+document.getElementById('game').style.display='block';
+document.getElementById('welcome').innerText='Welcome '+name;
+
+load();
+}
+
+function load(){
+const list=puzzles[mode];
+cur=list[Math.floor(Math.random()*list.length)];
+revealed=Array(cur.main.length).fill(false);
+found=[];
+drawWord();
+drawBoard();
+}
+
+function drawWord(){
+const box=document.getElementById('wordBox');
+box.innerHTML='';
+cur.main.split('').forEach((l,i)=>{
+const s=document.createElement('div');
+s.className='slot';
+s.innerText=revealed[i]?l:'';
+box.appendChild(s);
+});
+}
+
+/* MOBILE CENTER FIX */
+function drawBoard(){
+const board=document.getElementById('board');
+board.innerHTML='<canvas id="trail"></canvas>';
+
+canvas=document.getElementById('trail');
+ctx=canvas.getContext('2d');
+resize();
+
+word='';used=[];path=[];
+
+const rect=board.getBoundingClientRect();
+const r=Math.min(rect.width,rect.height)*0.32;
+const cx=rect.width/2;
+const cy=rect.height/2;
+
+const letters=shuffle(cur.main.split(''));
+
+letters.forEach((ch,i)=>{
+const a=(Math.PI*2/letters.length)*i;
+
+const d=document.createElement('div');
+d.className='tile';
+d.innerText=ch;
+d.dataset.l=ch;
+
+d.style.left=(cx+r*Math.cos(a)-31)+'px';
+d.style.top=(cy+r*Math.sin(a)-31)+'px';
+
+board.appendChild(d);
+
+d.addEventListener('pointerdown',start);
+});
+
+document.addEventListener('pointermove',move);
+document.addEventListener('pointerup',end);
+}
+
+function resize(){
+canvas.width=canvas.offsetWidth;
+canvas.height=canvas.offsetHeight;
+}
+
+function start(e){
+active=true;
+word='';used=[];path=[];
+ctx.clearRect(0,0,canvas.width,canvas.height);
+add(e.target);
+}
+
+function move(e){
+if(!active)return;
+
+const el=document.elementFromPoint(e.clientX,e.clientY);
+if(el&&el.classList.contains('tile'))add(el);
+
+if(active){
+const r=canvas.getBoundingClientRect();
+path.push({x:e.clientX-r.left,y:e.clientY-r.top});
+drawInk();
+spawnPetals(e.clientX-r.left,e.clientY-r.top);
+}
+}
+
+function drawInk(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ctx.strokeStyle='rgba(255,182,193,.85)';
+ctx.lineWidth=7;
+ctx.shadowColor='#e7c6ff';
+ctx.shadowBlur=18;
+ctx.lineCap='round';
+ctx.lineJoin='round';
+
+ctx.beginPath();
+for(let i=0;i<path.length-1;i++){
+const p0=path[i],p1=path[i+1];
+const mx=(p0.x+p1.x)/2,my=(p0.y+p1.y)/2;
+if(i===0)ctx.moveTo(p0.x,p0.y);
+ctx.quadraticCurveTo(p0.x,p0.y,mx,my);
+}
+ctx.stroke();
+ctx.shadowBlur=0;
+}
+
+/* 🌹 ULTRA SUBTLE ROSE PETALS (FINAL TUNING) */
+let particles=[];
+
+function spawnPetals(x,y){
+const petals=['#8b0000','#b3001b','#c1121f','#ff4d6d','#a4161a'];
+
+/* MUCH fewer petals */
+for(let i=0;i<1;i++){
+particles.push({
+x,
+y,
+
+/* very slow, drifting movement */
+vx:(Math.random()-0.5)*0.3,
+vy:(Math.random()*0.8)+0.2,
+
+/* longer life = gentle float */
+life:140,
+
+rot:(Math.random()*360),
+vr:(Math.random()-0.5)*0.8,
+
+color:petals[Math.floor(Math.random()*petals.length)],
+size:Math.random()*3+2
+});
+}
+
+updateParticles();
+}
+
+function updateParticles(){
+particles.forEach(p=>{
+p.x+=p.vx;
+p.y+=p.vy;
+p.rot+=p.vr;
+p.life--;
+
+ctx.save();
+ctx.translate(p.x,p.y);
+ctx.rotate(p.rot*Math.PI/180);
+
+ctx.fillStyle=p.color;
+ctx.beginPath();
+ctx.ellipse(0,0,p.size,p.size*1.6,0,0,Math.PI*2);
+ctx.fill();
+
+ctx.restore();
+});
+
+particles=particles.filter(p=>p.life>0);
+}
+
+function end(){active=false;check();}
+
+function add(el){
+if(used.includes(el))return;
+used.push(el);
+word+=el.dataset.l;
+el.classList.add('active');
+setTimeout(()=>el.classList.remove('active'),100);
+}
+
+function check(){
+document.querySelectorAll('.tile').forEach(t=>t.classList.remove('active'));
+ctx.clearRect(0,0,canvas.width,canvas.height);
+path=[];
+
+if(word===cur.main){
+revealed=cur.main.split('').map(()=>true);
+drawWord();
+showModal();
+}
+else if(cur.bonus.includes(word)){
+if(!found.includes(word))found.push(word);
+document.getElementById('found').innerHTML=
+found.map(w=>`<div class="tag">${w}</div>`).join('');
+}
+
+word='';used=[];
+}
+
+function showModal(){
+document.getElementById('result').innerHTML=
+`Name: ${name}<br>Word: ${cur.main}<br>Date: ${new Date().toLocaleDateString()}`;
+document.getElementById('modal').style.display='flex';
+}
+
+function shareResult(){
+const c=document.createElement('canvas');
+c.width=800;c.height=600;
+const x=c.getContext('2d');
+
+x.fillStyle='#2a1630';
+x.fillRect(0,0,c.width,c.height);
+
+x.fillStyle='#ffd6ff';
+x.font='bold 40px serif';
+x.fillText('Bookish Word Link',120,120);
+
+x.font='30px serif';
+x.fillText('Name: '+name,120,220);
+x.fillText('Word: '+cur.main,120,280);
+x.fillText('Date: '+new Date().toLocaleDateString(),120,340);
+
+const a=document.createElement('a');
+a.href=c.toDataURL('image/png');
+a.download='result.png';
+a.click();
+}
+
+function shuffle(a){return a.sort(()=>Math.random()-0.5);}
+</script>
+
+</body>
+</html>
