@@ -177,6 +177,7 @@ text-align:center;
 <div class="card">
 <div class="wordBox" id="wordBox"></div>
 <div class="found" id="found"></div>
+<button onclick="giveHint()">✨ Hint</button>
 </div>
 
 <div class="board" id="board">
@@ -588,6 +589,20 @@ a.click();
 }
 
 function shuffle(a){return a.sort(()=>Math.random()-0.5);}
+
+function giveHint(){
+const hiddenIndexes = revealed
+.map((v,i)=>!v ? i : null)
+.filter(v=>v !== null);
+
+if(hiddenIndexes.length === 0) return;
+
+const i = hiddenIndexes[Math.floor(Math.random()*hiddenIndexes.length)];
+revealed[i] = true;
+
+drawWord();
+}
+  
 </script>
 
 </body>
