@@ -177,7 +177,7 @@ text-align:center;
 <div class="card">
 <div class="wordBox" id="wordBox"></div>
 <div class="found" id="found"></div>
-<button onclick="giveHint()">✨ Hint</button>
+<button id="hintBtn" onclick="giveHint()">✨ Hint</button>
 </div>
 
 <div class="board" id="board">
@@ -357,7 +357,7 @@ hard:[
 ]
 };
 
-let cur,mode='easy',name='',word='',used=[],active=false;
+let cur,mode='easy',name='',word='',used=[],active=false,hintsLeft=0;
 let ctx,canvas,path=[];
 let revealed=[],found=[];
 
@@ -376,6 +376,9 @@ load();
 function load(){
 const list=puzzles[mode];
 cur=list[Math.floor(Math.random()*list.length)];
+if(mode==='easy') hintsLeft=0;
+if(mode==='medium') hintsLeft=3;
+if(mode==='hard') hintsLeft=5;
 revealed=Array(cur.main.length).fill(false);
 found=[];
 drawWord();
@@ -591,6 +594,8 @@ a.click();
 function shuffle(a){return a.sort(()=>Math.random()-0.5);}
 
 function giveHint(){
+if(hintsLeft<=0) return;
+
 const hiddenIndexes = revealed
 .map((v,i)=>!v ? i : null)
 .filter(v=>v !== null);
@@ -599,6 +604,8 @@ if(hiddenIndexes.length === 0) return;
 
 const i = hiddenIndexes[Math.floor(Math.random()*hiddenIndexes.length)];
 revealed[i] = true;
+
+hintsLeft--;
 
 drawWord();
 }
