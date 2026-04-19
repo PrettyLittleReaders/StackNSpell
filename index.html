@@ -377,8 +377,8 @@ function load(){
 const list=puzzles[mode];
 cur=list[Math.floor(Math.random()*list.length)];
 if(mode==='easy') hintsLeft=0;
-if(mode==='medium') hintsLeft=4;
-if(mode==='hard') hintsLeft=7;
+if(mode==='medium') hintsLeft=5;
+if(mode==='hard') hintsLeft=8;
 revealed=Array(cur.main.length).fill(false);
 found=[];
 drawWord();
